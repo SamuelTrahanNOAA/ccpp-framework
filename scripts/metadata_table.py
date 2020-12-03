@@ -326,6 +326,12 @@ class MetadataHeader(ParseSource):
             for property in properties:
                 pitems = property.split('=', 1)
                 if len(pitems) < 2:
+                    print(line)
+                    print(line.strip())
+                    print(line.strip().split('|'))
+                    print(properties)
+                    print(property)
+                    print(pitems)
                     raise ParseSyntaxError("variable property syntax",
                                            token=property,
                                            context=self._pobj)

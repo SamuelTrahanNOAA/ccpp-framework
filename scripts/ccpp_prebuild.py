@@ -214,40 +214,31 @@ def convert_local_name_from_new_metadata(metadata, standard_name, typedefs_new_m
     logging.info("Converting local name {0} of variable {1} from new to old metadata".format(local_name, standard_name))
     if "(" in local_name:
         (actual_var_name, array_reference) = split_var_name_and_array_reference(local_name)
-        indices = array_reference.lstrip('(').rstrip(')').split(',')
-        indices_local_names = []
-        for index_range in indices:
-            # Leave colons-only dimension alone
-            if index_range == ':':
-                indices_local_names.append(index_range)
+        clean = re.sub(r"\s+",'',array_reference)
+        tokens = re.split(r'([:,\(\)+-]+)',clean)
+        result = []
+        for token in tokens:
+            # Ignore empty strings.
+            if not token:
                 continue
-            # Split by colons to get a pair of dimensions
-            dimensions = index_range.split(':')
-            dimensions_local_names = []
-            for dimension in dimensions:
-                # Leave literals alone
-                try:
-                    int(dimension)
-                    dimensions_local_names.append(dimension)
-                    continue
-                except ValueError:
-                    pass
-                # Convert the local name of the dimension to old metadata standard, if necessary (recursive call)
-                (success, local_name_dim, converted_variables) = convert_local_name_from_new_metadata(
-                                      metadata, dimension, typedefs_new_metadata, converted_variables)
-                if not success:
-                    return (success, None, converted_variables)
-                # Update the local name of the dimension, if necessary
-                if not metadata[dimension][0].local_name == local_name_dim:
-                    logging.debug("Updating local name of variable {0} from {1} to {2}".format(dimension,
-                                                      metadata[dimension][0].local_name, local_name_dim))
-                    metadata[dimension][0].local_name = local_name_dim
-                dimensions_local_names.append(local_name_dim)
-            indices_local_names.append(':'.join(dimensions_local_names))
-        # Put back together the array reference with local names in old metadata format
-        array_reference_local_names = '(' + ','.join(indices_local_names) + ')'
+            # Pass separators and integers unmodified:
+            if '0123456789:(),+-'.find(token[0])>=0:
+                result.append(token)
+                continue
+            # Convert the local name of the dimension to old metadata standard, if necessary (recursive call)
+            (success, local_name_token, converted_variables) = convert_local_name_from_new_metadata(
+                                  metadata, token, typedefs_new_metadata, converted_variables)
+            if not success:
+                return (success, None, converted_variables)
+            # Update the local name of the dimension, if necessary
+            if not metadata[token][0].local_name == local_name_token:
+                logging.debug("Updating local name of variable {0} from {1} to {2}".format(token,
+                                                  metadata[token][0].local_name, local_name_token))
+                metadata[token][0].local_name = local_name_token
+            result.append(local_name_token)
         # Compose local name (still without any DDT reference prefix)
-        local_name = actual_var_name + array_reference_local_names
+        new_local_name = actual_var_name + ''.join(result)
+        local_name=new_local_name
 
     # Prefix the local name with the reference if not empty
     if typedefs_new_metadata[module_name][type_name]:
